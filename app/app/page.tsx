@@ -12,7 +12,6 @@ export default function AppPage() {
   const [result, setResult] = useState<string | null>(null);
   const [rects, setRects] = useState<Rect[]>([]);
   const [drawing, setDrawing] = useState(false);
-  const [currentRect, setCurrentRect] = useState<Rect | null>(null);
   const [sliderPos, setSliderPos] = useState(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +19,7 @@ export default function AppPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
+  const rectsRef = useRef<Rect[]>([]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -32,26 +32,21 @@ export default function AppPage() {
     setImageFile(file);
     setResult(null);
     setRects([]);
+    rectsRef.current = [];
     setError(null);
     setLimitReached(false);
     const url = URL.createObjectURL(file);
     setImage(url);
   };
 
-  const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-
-  const drawRects = useCallback((extra?: Rect) => {
+  const drawCanvas = (currentRects: Rect[], extra?: Rect) => {
     const canvas = canvasRef.current;
     const img = imgRef.current;
-    if (!canvas || !img) return;
+    if (!canvas || !img || !canvas.width) return;
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const allRects = extra ? [...rects, extra] : rects;
+    const allRects = extra ? [...currentRects, extra] : currentRects;
     allRects.forEach((r) => {
       ctx.strokeStyle = "#6366f1";
       ctx.lineWidth = 2;
@@ -60,7 +55,27 @@ export default function AppPage() {
       ctx.fillStyle = "rgba(99,102,241,0.15)";
       ctx.fillRect(r.x, r.y, r.w, r.h);
     });
-  }, [rects]);
+  };
+
+  const onImgLoad = () => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    drawCanvas([]);
+  };
+
+  const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  };
 
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     startPos.current = getCanvasPos(e);
@@ -68,46 +83,49 @@ export default function AppPage() {
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!drawing || !startPos.current) return;
+    if (!startPos.current) return;
     const pos = getCanvasPos(e);
     const r = { x: startPos.current.x, y: startPos.current.y, w: pos.x - startPos.current.x, h: pos.y - startPos.current.y };
-    setCurrentRect(r);
-    drawRects(r);
+    drawCanvas(rectsRef.current, r);
   };
 
   const onMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!drawing || !startPos.current) return;
+    if (!startPos.current) return;
     const pos = getCanvasPos(e);
     const r = { x: startPos.current.x, y: startPos.current.y, w: pos.x - startPos.current.x, h: pos.y - startPos.current.y };
-    if (Math.abs(r.w) > 5 && Math.abs(r.h) > 5) setRects((prev) => [...prev, r]);
+    if (Math.abs(r.w) > 5 && Math.abs(r.h) > 5) {
+      const newRects = [...rectsRef.current, r];
+      rectsRef.current = newRects;
+      setRects(newRects);
+      drawCanvas(newRects);
+    }
     setDrawing(false);
-    setCurrentRect(null);
     startPos.current = null;
   };
 
-  const buildMask = (): Blob => {
-    const canvas = document.createElement("canvas");
-    const img = imgRef.current!;
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const scaleX = img.naturalWidth / canvasRef.current!.width;
-    const scaleY = img.naturalHeight / canvasRef.current!.height;
-    rects.forEach((r) => {
-      ctx.fillStyle = "white";
-      ctx.fillRect(r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY);
+  const buildMask = (): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      const img = imgRef.current!;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      rectsRef.current.forEach((r) => {
+        ctx.fillStyle = "white";
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+      });
+      canvas.toBlob((b) => resolve(b!), "image/png");
     });
-    return new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/png")) as unknown as Blob;
   };
 
   const handleProcess = async () => {
-    if (!imageFile || rects.length === 0) { setError("Please select at least one watermark area"); return; }
+    if (!imageFile || rectsRef.current.length === 0) { setError("Please select at least one watermark area"); return; }
     setLoading(true);
     setError(null);
     try {
-      const mask = await (buildMask() as unknown as Promise<Blob>);
+      const mask = await buildMask();
       const form = new FormData();
       form.append("image", imageFile);
       form.append("mask", mask, "mask.png");
@@ -126,6 +144,11 @@ export default function AppPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetAll = () => {
+    setImage(null); setImageFile(null); setResult(null);
+    setRects([]); rectsRef.current = []; setError(null); setLimitReached(false);
   };
 
   return (
@@ -161,21 +184,20 @@ export default function AppPage() {
           <div className="space-y-4">
             {/* Canvas editor */}
             {!result && (
-              <div className="relative">
+              <div>
                 <p className="text-sm text-gray-400 mb-2">Draw rectangles over watermark areas:</p>
                 <canvas
                   ref={canvasRef}
-                  width={800}
-                  height={500}
                   className="w-full rounded-xl border border-gray-700 cursor-crosshair"
+                  style={{ imageRendering: "pixelated" }}
                   onMouseDown={onMouseDown}
                   onMouseMove={onMouseMove}
                   onMouseUp={onMouseUp}
                 />
-                <img ref={imgRef} src={image} className="hidden" onLoad={() => drawRects()} alt="" />
+                <img ref={imgRef} src={image} className="hidden" onLoad={onImgLoad} alt="" />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => { setRects([]); drawRects(); }} className="text-sm text-gray-400 hover:text-white border border-gray-700 px-3 py-1 rounded-lg">Reset</button>
-                  <button onClick={() => { setRects((r) => r.slice(0, -1)); setTimeout(() => drawRects(), 0); }} className="text-sm text-gray-400 hover:text-white border border-gray-700 px-3 py-1 rounded-lg">Undo</button>
+                  <button onClick={() => { rectsRef.current = []; setRects([]); drawCanvas([]); }} className="text-sm text-gray-400 hover:text-white border border-gray-700 px-3 py-1 rounded-lg">Reset</button>
+                  <button onClick={() => { const r = rectsRef.current.slice(0, -1); rectsRef.current = r; setRects(r); drawCanvas(r); }} className="text-sm text-gray-400 hover:text-white border border-gray-700 px-3 py-1 rounded-lg">Undo</button>
                   <span className="text-sm text-gray-500 self-center">{rects.length} area{rects.length !== 1 ? "s" : ""} selected</span>
                 </div>
               </div>
@@ -190,7 +212,7 @@ export default function AppPage() {
                 </div>
                 <div className="absolute inset-y-0 flex items-center" style={{ left: `${sliderPos}%` }}>
                   <div className="w-0.5 h-full bg-white opacity-80" />
-                  <div className="absolute bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg -translate-x-1/2 cursor-ew-resize text-gray-800 font-bold text-xs">⟺</div>
+                  <div className="absolute bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg -translate-x-1/2 text-gray-800 font-bold text-xs">⟺</div>
                 </div>
                 <input type="range" min={0} max={100} value={sliderPos} onChange={(e) => setSliderPos(+e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize" />
                 <div className="absolute top-2 left-2 bg-black/50 text-xs px-2 py-1 rounded">Before</div>
@@ -219,15 +241,15 @@ export default function AppPage() {
                   disabled={loading || rects.length === 0}
                   className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2.5 rounded-xl font-semibold transition flex items-center gap-2"
                 >
-                  {loading ? <><span className="animate-spin">⏳</span> Processing...</> : "Remove Watermark"}
+                  {loading ? <><span className="animate-spin inline-block">⏳</span> Processing...</> : "Remove Watermark"}
                 </button>
               ) : (
                 <>
                   <a href={result} download="dewatermarked.png" className="bg-green-600 hover:bg-green-500 px-6 py-2.5 rounded-xl font-semibold transition">Download</a>
-                  <button onClick={() => { setResult(null); setRects([]); }} className="border border-gray-700 hover:border-gray-500 px-6 py-2.5 rounded-xl transition">Try Again</button>
+                  <button onClick={() => { setResult(null); setRects([]); rectsRef.current = []; }} className="border border-gray-700 hover:border-gray-500 px-6 py-2.5 rounded-xl transition">Try Again</button>
                 </>
               )}
-              <button onClick={() => { setImage(null); setImageFile(null); setResult(null); setRects([]); setError(null); }} className="text-gray-500 hover:text-gray-300 px-4 py-2.5 transition">New Image</button>
+              <button onClick={resetAll} className="text-gray-500 hover:text-gray-300 px-4 py-2.5 transition">New Image</button>
             </div>
           </div>
         )}

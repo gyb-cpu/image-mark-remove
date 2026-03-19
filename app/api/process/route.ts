@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     const stabilityForm = new FormData();
     stabilityForm.append("image", imageFile);
     stabilityForm.append("mask", maskFile);
+    stabilityForm.append("prompt", "clean background, seamless texture, no watermark");
     stabilityForm.append("output_format", "png");
 
     const stabilityRes = await fetch("https://api.stability.ai/v2beta/stable-image/edit/inpaint", {
