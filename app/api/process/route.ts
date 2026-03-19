@@ -39,24 +39,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image and mask required" }, { status: 400 });
     }
 
-    // Call Clipdrop API - process in memory, never store to disk
-    const clipdropForm = new FormData();
-    clipdropForm.append("image_file", imageFile);
-    clipdropForm.append("mask_file", maskFile);
+    // Call Stability AI Inpainting API - process in memory, never store to disk
+    const stabilityForm = new FormData();
+    stabilityForm.append("image", imageFile);
+    stabilityForm.append("mask", maskFile);
+    stabilityForm.append("output_format", "png");
 
-    const clipdropRes = await fetch("https://clipdrop-api.co/cleanup/v1", {
+    const stabilityRes = await fetch("https://api.stability.ai/v2beta/stable-image/edit/inpaint", {
       method: "POST",
-      headers: { "x-api-key": process.env.CLIPDROP_API_KEY! },
-      body: clipdropForm,
+      headers: {
+        "authorization": `Bearer ${process.env.STABILITY_API_KEY!}`,
+        "accept": "image/*",
+      },
+      body: stabilityForm,
     });
 
-    if (!clipdropRes.ok) {
-      const err = await clipdropRes.text();
-      return NextResponse.json({ error: `Clipdrop error: ${err}` }, { status: 500 });
+    if (!stabilityRes.ok) {
+      const err = await stabilityRes.text();
+      return NextResponse.json({ error: `Stability AI error: ${err}` }, { status: 500 });
     }
 
     const isPro = session?.user && (session.user as any).isPro;
-    const rawBuffer = Buffer.from(await clipdropRes.arrayBuffer());
+    const rawBuffer = Buffer.from(await stabilityRes.arrayBuffer());
     let resultBuffer: Buffer;
 
     // Compress for free users
