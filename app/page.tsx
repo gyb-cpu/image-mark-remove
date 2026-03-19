@@ -1,65 +1,64 @@
-import Image from "next/image";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: "dewatermark.ai — Free AI Watermark Remover Online",
+  description: "Remove watermarks from images instantly with AI. Free online watermark remover. No signup required for first 3 images.",
+  openGraph: {
+    title: "dewatermark.ai — Free AI Watermark Remover",
+    description: "Remove watermarks from images instantly with AI. Clean, fast, no traces left.",
+    url: "https://dewatermark.ai",
+    siteName: "dewatermark.ai",
+    type: "website",
+  },
+};
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-gray-950 text-white">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+        <span className="text-xl font-bold text-indigo-400">dewatermark.ai</span>
+        <div className="flex gap-4 text-sm">
+          <Link href="/pricing" className="text-gray-400 hover:text-white transition">Pricing</Link>
+          <Link href="/login" className="text-gray-400 hover:text-white transition">Login</Link>
+          <Link href="/app" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Try Free</Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="flex flex-col items-center text-center px-6 py-24 gap-6">
+        <h1 className="text-5xl font-extrabold leading-tight max-w-2xl">
+          Remove Watermarks from Images with AI
+        </h1>
+        <p className="text-gray-400 text-lg max-w-xl">
+          Upload your image, select the watermark area, and let AI do the rest. No traces, no storage, no hassle.
+        </p>
+        <Link href="/app" className="bg-indigo-600 hover:bg-indigo-500 text-white text-lg px-8 py-3 rounded-xl font-semibold transition">
+          Remove Watermark Free →
+        </Link>
+        <p className="text-gray-500 text-sm">No signup needed · 3 free images/day</p>
+      </section>
+
+      {/* Features */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 pb-24 max-w-5xl mx-auto">
+        {[
+          { icon: "🎯", title: "Precise Selection", desc: "Draw rectangles over watermark areas. Support multiple selections." },
+          { icon: "🤖", title: "AI-Powered Removal", desc: "Powered by Clipdrop AI. Seamless inpainting with no visible traces." },
+          { icon: "🔒", title: "Privacy First", desc: "Your images are never stored. Processed in memory and returned instantly." },
+        ].map((f) => (
+          <div key={f.title} className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+            <div className="text-3xl mb-3">{f.icon}</div>
+            <h3 className="font-semibold text-lg mb-2">{f.title}</h3>
+            <p className="text-gray-400 text-sm">{f.desc}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* Footer */}
+      <footer className="text-center text-gray-600 text-sm pb-8">
+        © 2026 dewatermark.ai · <Link href="/pricing" className="hover:text-gray-400">Pricing</Link>
+      </footer>
+    </main>
   );
 }
