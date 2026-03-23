@@ -1,16 +1,26 @@
-import { getServerSession } from "next-auth";
-import { authOptions, users } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export default async function DashboardPage({ searchParams }: { searchParams: { upgraded?: string } }) {
-  const session = await getServerSession(authOptions);
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
+  const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
-  const user = users[session.user.email];
-  const isPro = user?.isPro ?? false;
-  const usageCount = user?.usageCount ?? 0;
+  const kv = (globalThis as any).USERS_KV;
+  let isPro = false;
+  let usageCount = 0;
+
+  if (kv) {
+    const raw = await kv.get(`user:${session.user.email}`);
+    if (raw) {
+      const user = JSON.parse(raw);
+      isPro = user.isPro ?? false;
+      usageCount = user.usageCount ?? 0;
+    }
+  }
+
   const limit = isPro ? "∞" : "5";
+  const params = await searchParams;
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
@@ -20,7 +30,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       </nav>
 
       <div className="max-w-2xl mx-auto px-6 py-16">
-        {searchParams.upgraded && (
+        {params.upgraded && (
           <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 mb-6 text-sm text-green-300">
             🎉 Welcome to Pro! Unlimited watermark removal is now unlocked.
           </div>
