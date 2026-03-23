@@ -5,7 +5,7 @@ pages_build_output_dir = ".vercel/output/static"
 
 [[kv_namespaces]]
 binding = "USERS_KV"
-id = "8e81018e4dead3370dd15e0fa6155f16"
+id = "ece295318b65487786a6515926f1f00b"
 
 [vars]
 NEXTAUTH_URL = "https://dewatermarkbyme.xyz"
