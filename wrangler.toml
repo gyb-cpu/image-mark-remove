@@ -1,0 +1,11 @@
+name = "dewatermark"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[kv_namespaces]]
+binding = "USERS_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+[vars]
+NEXTAUTH_URL = "https://dewatermarkbyme.xyz"

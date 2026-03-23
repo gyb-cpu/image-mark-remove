@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
-import { users } from "@/lib/users";
+import { auth } from "@/lib/auth";
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
-
-// IP-based rate limiting for guests
-const ipUsage: Record<string, { count: number; date: string }> = {};
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -19,27 +15,36 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const session = await auth();
   const today = new Date().toDateString();
+  const kv = (globalThis as any).USERS_KV;
 
   // Check rate limits
-  if (!token?.email) {
+  if (!session?.user?.email) {
+    // Guest: IP-based rate limit via KV
     const ip = req.headers.get("x-forwarded-for") || "unknown";
-    if (!ipUsage[ip] || ipUsage[ip].date !== today) {
-      ipUsage[ip] = { count: 0, date: today };
-    }
-    if (ipUsage[ip].count >= 3) {
-      return NextResponse.json({ error: "Daily limit reached. Sign up for more.", limitReached: true }, { status: 429 });
-    }
-    ipUsage[ip].count++;
-  } else {
-    const user = users[token.email as string];
-    if (user) {
-      if (user.lastReset !== today) { user.usageCount = 0; user.lastReset = today; }
-      if (!user.isPro && user.usageCount >= 5) {
-        return NextResponse.json({ error: "Daily limit reached. Upgrade to Pro.", limitReached: true }, { status: 429 });
+    if (kv) {
+      const raw = await kv.get(`ip:${ip}:${today}`);
+      const count = raw ? parseInt(raw) : 0;
+      if (count >= 3) {
+        return NextResponse.json({ error: "Daily limit reached. Sign up for more.", limitReached: true }, { status: 429 });
       }
-      user.usageCount++;
+      await kv.put(`ip:${ip}:${today}`, String(count + 1), { expirationTtl: 86400 });
+    }
+  } else {
+    // Logged-in user: check usage from KV
+    if (kv) {
+      const email = session.user.email;
+      const raw = await kv.get(`user:${email}`);
+      if (raw) {
+        const user = JSON.parse(raw);
+        if (user.lastReset !== today) { user.usageCount = 0; user.lastReset = today; }
+        if (!user.isPro && user.usageCount >= 5) {
+          return NextResponse.json({ error: "Daily limit reached. Upgrade to Pro.", limitReached: true }, { status: 429 });
+        }
+        user.usageCount++;
+        await kv.put(`user:${email}`, JSON.stringify(user));
+      }
     }
   }
 
