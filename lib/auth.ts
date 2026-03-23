@@ -2,8 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-// In-memory user store for MVP (replace with D1 in production)
-const users: Record<string, { id: string; email: string; password: string; isPro: boolean; usageCount: number; lastReset: string }> = {};
+import { users } from "@/lib/users";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -59,4 +58,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export { users };
+export { users } from "@/lib/users";

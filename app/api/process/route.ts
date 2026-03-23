@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions, users } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
+import { users } from "@/lib/users";
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // IP-based rate limiting for guests
 const ipUsage: Record<string, { count: number; date: string }> = {};
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const today = new Date().toDateString();
 
   // Check rate limits
-  if (!session?.user?.email) {
+  if (!token?.email) {
     const ip = req.headers.get("x-forwarded-for") || "unknown";
     if (!ipUsage[ip] || ipUsage[ip].date !== today) {
       ipUsage[ip] = { count: 0, date: today };
@@ -20,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
     ipUsage[ip].count++;
   } else {
-    const user = users[session.user.email];
+    const user = users[token.email as string];
     if (user) {
       if (user.lastReset !== today) { user.usageCount = 0; user.lastReset = today; }
       if (!user.isPro && user.usageCount >= 5) {
@@ -60,22 +73,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Stability AI error: ${err}` }, { status: 500 });
     }
 
-    const isPro = session?.user && (session.user as any).isPro;
-    const rawBuffer = Buffer.from(await stabilityRes.arrayBuffer());
-    let resultBuffer: Buffer;
+    const rawBuffer = await stabilityRes.arrayBuffer();
 
-    // Compress for free users
-    if (!isPro) {
-      const sharp = (await import("sharp")).default;
-      resultBuffer = await sharp(rawBuffer).resize(1080, 1080, { fit: "inside", withoutEnlargement: true }).toBuffer() as Buffer;
-    } else {
-      resultBuffer = rawBuffer;
-    }
-
-    return new NextResponse(new Uint8Array(resultBuffer), {
+    return new NextResponse(new Uint8Array(rawBuffer), {
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": "attachment; filename=dewatermarked.png",
+        ...CORS_HEADERS,
       },
     });
   } catch (err: any) {
