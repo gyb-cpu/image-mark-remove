@@ -1,8 +1,8 @@
-export const runtime = 'edge';
-
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/auth-edge";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+
+export const runtime = 'edge';
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
   const session = await auth();

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.email) {
     return NextResponse.json({ error: "Login required" }, { status: 401 });
   }
 
@@ -16,10 +16,10 @@ export async function POST(req: NextRequest) {
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: process.env.STRIPE_PRO_PRICE_ID!, quantity: 1 }],
-    customer_email: session.user.email,
+    customer_email: token.email as string,
     success_url: `${process.env.NEXTAUTH_URL}/dashboard?upgraded=true`,
     cancel_url: `${process.env.NEXTAUTH_URL}/pricing`,
-    metadata: { userEmail: session.user.email },
+    metadata: { userEmail: token.email as string },
   });
 
   return NextResponse.json({ url: checkoutSession.url });

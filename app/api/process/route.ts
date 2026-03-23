@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -15,13 +15,11 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const today = new Date().toDateString();
   const kv = (globalThis as any).USERS_KV;
 
-  // Check rate limits
-  if (!session?.user?.email) {
-    // Guest: IP-based rate limit via KV
+  if (!token?.email) {
     const ip = req.headers.get("x-forwarded-for") || "unknown";
     if (kv) {
       const raw = await kv.get(`ip:${ip}:${today}`);
@@ -32,9 +30,8 @@ export async function POST(req: NextRequest) {
       await kv.put(`ip:${ip}:${today}`, String(count + 1), { expirationTtl: 86400 });
     }
   } else {
-    // Logged-in user: check usage from KV
     if (kv) {
-      const email = session.user.email;
+      const email = token.email as string;
       const raw = await kv.get(`user:${email}`);
       if (raw) {
         const user = JSON.parse(raw);
@@ -57,7 +54,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image and mask required" }, { status: 400 });
     }
 
-    // Call Stability AI Inpainting API - process in memory, never store to disk
     const stabilityForm = new FormData();
     stabilityForm.append("image", imageFile);
     stabilityForm.append("mask", maskFile);
