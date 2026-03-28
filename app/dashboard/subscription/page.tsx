@@ -108,7 +108,7 @@ export default async function SubscriptionPage() {
             <button
               type="submit"
               className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl py-3 font-semibold transition"
-              onClick="return confirm('Are you sure you want to cancel? You will lose access at the end of billing period.')"
+              onClick={() => { if (!confirm('Are you sure you want to cancel? You will lose access at the end of billing period.')) { event?.preventDefault(); } }}
             >
               Cancel Subscription
             </button>
