@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import ProButton from "./pro-button";
 
 export const metadata: Metadata = {
   title: "Pricing — dewatermark.ai",
@@ -43,20 +44,15 @@ export default function PricingPage() {
                 <li key={f} className="flex items-center gap-2"><span className="text-indigo-400">✓</span>{f}</li>
               ))}
             </ul>
-            <ProButton />
+            <div className="mt-6">
+              <ProButton />
+            </div>
+            <div className="text-xs text-gray-400 mt-4 text-center">
+              Secure payment via PayPal · Cancel anytime
+            </div>
           </div>
         </div>
       </div>
     </main>
-  );
-}
-
-function ProButton() {
-  return (
-    <form action="/api/stripe/checkout" method="POST">
-      <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 rounded-xl py-2.5 font-semibold transition">
-        Upgrade to Pro →
-      </button>
-    </form>
   );
 }

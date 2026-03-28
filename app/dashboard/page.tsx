@@ -1,11 +1,10 @@
-import { auth } from "@/lib/auth-edge";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export const runtime = 'edge';
-
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
 
   const kv = (globalThis as any).USERS_KV;
@@ -61,6 +60,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             Upgrade to Pro — $12/mo →
           </Link>
         )}
+
+        {/* Quick Links */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <Link href="/dashboard/profile" className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition">
+            <p className="text-lg font-medium mb-1">👤 Profile</p>
+            <p className="text-gray-400 text-sm">Edit your account settings</p>
+          </Link>
+          <Link href="/dashboard/history" className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition">
+            <p className="text-lg font-medium mb-1">📊 History</p>
+            <p className="text-gray-400 text-sm">View usage history</p>
+          </Link>
+          <Link href="/dashboard/subscription" className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition">
+            <p className="text-lg font-medium mb-1">💳 Subscription</p>
+            <p className="text-gray-400 text-sm">Manage your plan</p>
+          </Link>
+        </div>
       </div>
     </main>
   );

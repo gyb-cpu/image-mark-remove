@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { createUser, getUser } from "./users-memory";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,10 +19,11 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         const { email, password, isRegister } = credentials;
-        const kv = (globalThis as any).USERS_KV;
 
-        if (isRegister === "true") {
-          if (kv) {
+        // Try KV first
+        const kv = (globalThis as any).USERS_KV;
+        if (kv) {
+          if (isRegister === "true") {
             const existing = await kv.get(`user:${email}`);
             if (existing) throw new Error("Email already exists");
             const id = Math.random().toString(36).slice(2);
@@ -29,22 +31,40 @@ export const authOptions: NextAuthOptions = {
               id, email, password, isPro: false, usageCount: 0, lastReset: new Date().toDateString()
             }));
             return { id, email };
+          } else {
+            const raw = await kv.get(`user:${email}`);
+            if (!raw) throw new Error("Invalid credentials");
+            const user = JSON.parse(raw);
+            if (user.password !== password) throw new Error("Invalid credentials");
+            return { id: user.id, email };
           }
-          return null;
         }
 
-        if (kv) {
-          const raw = await kv.get(`user:${email}`);
-          if (!raw) throw new Error("Invalid credentials");
-          const user = JSON.parse(raw);
-          if (user.password !== password) throw new Error("Invalid credentials");
-          return { id: user.id, email };
+        // Fallback to memory
+        const existingUser = getUser(email);
+        if (isRegister === "true") {
+          if (existingUser) throw new Error("Email already exists");
+          const newUser = createUser(email, email.split('@')[0], undefined, undefined);
+          newUser.password = password;
+          return { id: newUser.id, email: newUser.email };
+        } else {
+          if (!existingUser || existingUser.password !== password) throw new Error("Invalid credentials");
+          return { id: existingUser.id, email: existingUser.email };
         }
-        return null;
       },
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google' && user.email) {
+        // Create user in memory if not exists
+        const existing = getUser(user.email);
+        if (!existing) {
+          createUser(user.email, user.name || user.email.split('@')[0], user.image || undefined, account.providerAccountId);
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) token.id = user.id;
       return token;
