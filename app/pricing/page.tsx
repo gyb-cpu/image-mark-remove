@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { auth } from "@/lib/auth";
 import ProButton from "./pro-button";
 
 export const metadata: Metadata = {
@@ -7,12 +8,23 @@ export const metadata: Metadata = {
   description: "Free and Pro plans for AI watermark removal.",
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const session = await auth();
+
   return (
     <main className="min-h-screen bg-gray-950 text-white">
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <Link href="/" className="text-xl font-bold text-indigo-400">dewatermark.ai</Link>
-        <Link href="/login" className="text-sm text-gray-400 hover:text-white">Login</Link>
+        <div className="flex gap-4 text-sm items-center">
+          {session?.user ? (
+            <>
+              <Link href="/dashboard" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Dashboard</Link>
+              <span className="text-gray-400">{session.user.email}</span>
+            </>
+          ) : (
+            <Link href="/login" className="text-gray-400 hover:text-white">Login</Link>
+          )}
+        </div>
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-20 text-center">
