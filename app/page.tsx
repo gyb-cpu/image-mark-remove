@@ -14,6 +14,8 @@ export const metadata: Metadata = {
   },
 };
 
+export const runtime = 'edge';
+
 export default async function HomePage() {
   const session = await auth();
 
