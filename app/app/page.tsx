@@ -156,8 +156,12 @@ export default function AppPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <Link href="/" className="text-xl font-bold text-indigo-400">dewatermark.ai</Link>
         <div className="flex gap-4 text-sm items-center">
+          <Link href="/pricing" className="text-gray-400 hover:text-white transition">Pricing</Link>
           {session ? (
-            <span className="text-gray-400">{session.user?.email} · {(session.user as any)?.isPro ? "Pro ✨" : `${(session.user as any)?.usageCount ?? 0}/5 today`}</span>
+            <>
+              <Link href="/dashboard" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Dashboard</Link>
+              <span className="text-gray-400">{session.user?.email} · {(session.user as any)?.isPro ? "Pro ✨" : `${(session.user as any)?.usageCount ?? 0}/5 today`}</span>
+            </>
           ) : (
             <Link href="/login" className="text-gray-400 hover:text-white">Login</Link>
           )}
