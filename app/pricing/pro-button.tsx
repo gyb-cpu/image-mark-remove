@@ -89,7 +89,8 @@ export default function ProButton() {
             if (response.ok && result.success) {
               console.log("Payment successful, redirecting...");
               alert("Payment successful! Upgrading to Pro...");
-              router.push("/dashboard?upgraded=true");
+              // Force reload then redirect
+              window.location.href = "/dashboard?upgraded=true";
             } else {
               const errorMsg = result.debug?.error || result.details || result.error || "Payment failed";
               console.error("Payment failed:", errorMsg);
