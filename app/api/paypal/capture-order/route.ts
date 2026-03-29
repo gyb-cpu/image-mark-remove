@@ -27,39 +27,56 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-function parseCookie(cookieHeader: string | null, name: string): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.split(';').find(c => c.trim().startsWith(name + '='));
-  return match ? match.split('=')[1] : null;
-}
-
-async function getSessionFromCookie(request: NextRequest) {
-  const cookieHeader = request.headers.get('cookie');
-  const sessionToken = parseCookie(cookieHeader, 'next-auth.session-token');
-  
-  if (!sessionToken || !NEXTAUTH_SECRET) return null;
-  
-  try {
-    const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
-    const { payload } = await jwtVerify(sessionToken, secret);
-    return { user: { email: payload.email as string, id: payload.sub as string } };
-  } catch (e) {
-    console.error("Session decode error:", e);
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionFromCookie(request);
+    // Parse cookies from request header
+    const cookieHeader = request.headers.get('cookie') || '';
+    const cookies = Object.fromEntries(
+      cookieHeader.split(';').map(c => c.trim().split('=')).filter(([k]) => k)
+    );
     
-    if (!session?.user?.email) {
+    const sessionToken = cookies['next-auth.session-token'];
+    
+    console.log("Has cookie:", !!sessionToken);
+    console.log("Has NEXTAUTH_SECRET:", !!NEXTAUTH_SECRET);
+    
+    if (!sessionToken) {
       return NextResponse.json({ 
-        error: "Unauthorized - Please log in first"
+        error: "Unauthorized - No session cookie found. Please log in first.",
+        debug: { hasCookie: !!sessionToken }
+      }, { status: 401 });
+    }
+
+    if (!NEXTAUTH_SECRET) {
+      return NextResponse.json({ 
+        error: "Server configuration error - NEXTAUTH_SECRET not set",
+        debug: { hasSecret: !!NEXTAUTH_SECRET }
+      }, { status: 500 });
+    }
+
+    // Verify JWT token
+    let email: string;
+    try {
+      const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
+      const { payload } = await jwtVerify(sessionToken, secret);
+      email = payload.email as string;
+      console.log("Decoded email:", email);
+    } catch (e) {
+      console.error("JWT verification failed:", e);
+      return NextResponse.json({ 
+        error: "Invalid session token",
+        debug: { error: e instanceof Error ? e.message : "Unknown" }
+      }, { status: 401 });
+    }
+
+    if (!email) {
+      return NextResponse.json({ 
+        error: "Invalid session - no email in token"
       }, { status: 401 });
     }
 
     const { orderId } = await request.json();
+    console.log("Processing order:", orderId);
 
     const accessToken = await getPayPalAccessToken();
 
@@ -74,6 +91,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.json();
+      console.error("PayPal capture error:", error);
       return NextResponse.json({ error }, { status: 400 });
     }
 
@@ -82,9 +100,9 @@ export async function POST(request: NextRequest) {
 
     if (status === "COMPLETED") {
       // Update user to Pro
-      const user = getUser(session.user.email);
+      const user = getUser(email);
       if (user) {
-        updateUser(session.user.email, {
+        updateUser(email, {
           isPro: true,
           subscriptionStatus: "active",
           subscriptionId: `paypal_${orderId}`,
@@ -92,7 +110,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Add usage record
-      addUsageRecord(session.user.email, {
+      addUsageRecord(email, {
         originalUrl: "",
         resultUrl: "",
         status: "completed",
