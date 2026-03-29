@@ -31,19 +31,34 @@ export async function POST(request: NextRequest) {
   try {
     // Parse cookies from request header
     const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = Object.fromEntries(
-      cookieHeader.split(';').map(c => c.trim().split('=')).filter(([k]) => k)
-    );
+    console.log("Raw cookie header:", cookieHeader.substring(0, 100) + (cookieHeader.length > 100 ? '...' : ''));
+    
+    // Parse cookie properly
+    const cookies: Record<string, string> = {};
+    cookieHeader.split(';').forEach(c => {
+      const eq = c.indexOf('=');
+      if (eq > 0) {
+        const key = c.substring(0, eq).trim();
+        const val = c.substring(eq + 1).trim();
+        cookies[key] = val;
+      }
+    });
+    
+    console.log("Parsed cookies:", Object.keys(cookies));
     
     const sessionToken = cookies['next-auth.session-token'];
     
-    console.log("Has cookie:", !!sessionToken);
+    console.log("Has session token:", !!sessionToken);
+    console.log("Token length:", sessionToken?.length);
     console.log("Has NEXTAUTH_SECRET:", !!NEXTAUTH_SECRET);
     
     if (!sessionToken) {
       return NextResponse.json({ 
         error: "Unauthorized - No session cookie found. Please log in first.",
-        debug: { hasCookie: !!sessionToken }
+        debug: { 
+          hasCookie: !!sessionToken,
+          availableCookies: Object.keys(cookies)
+        }
       }, { status: 401 });
     }
 
@@ -61,6 +76,7 @@ export async function POST(request: NextRequest) {
       const { payload } = await jwtVerify(sessionToken, secret);
       email = payload.email as string;
       console.log("Decoded email:", email);
+      console.log("Token payload:", payload);
     } catch (e) {
       console.error("JWT verification failed:", e);
       return NextResponse.json({ 
