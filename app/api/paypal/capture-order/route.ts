@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { getUser, updateUser, addUsageRecord } from "@/lib/users-memory";
-import { jwtVerify } from "jose";
 
 export const runtime = 'edge';
 
 const PAYPAL_API_URL = process.env.PAYPAL_API_URL || "https://api-m.sandbox.paypal.com";
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET!;
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET!;
 
 async function getPayPalAccessToken() {
   const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
@@ -29,75 +28,14 @@ async function getPayPalAccessToken() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse cookies from request header
-    const cookieHeader = request.headers.get('cookie') || '';
-    console.log("Raw cookie header length:", cookieHeader.length);
-    console.log("Has cookie header:", !!cookieHeader);
+    // Use next-auth v5 auth() API to get session
+    const session = await auth();
     
-    // Parse cookie properly
-    const cookies: Record<string, string> = {};
-    cookieHeader.split(';').forEach(c => {
-      const eq = c.indexOf('=');
-      if (eq > 0) {
-        const key = c.substring(0, eq).trim();
-        const val = c.substring(eq + 1).trim();
-        cookies[key] = val;
-      }
-    });
+    console.log("Session from auth():", session ? { email: session.user?.email, hasId: !!session.user?.id } : "null");
     
-    console.log("Available cookie names:", Object.keys(cookies));
-    
-    // Try both possible cookie names
-    const sessionToken = cookies['next-auth.session-token'] || cookies['__Secure-next-auth.session-token'];
-    
-    console.log("Found session token:", !!sessionToken);
-    console.log("Token length:", sessionToken?.length);
-    console.log("Has NEXTAUTH_SECRET:", !!NEXTAUTH_SECRET);
-    
-    if (!sessionToken) {
+    if (!session?.user?.email) {
       return NextResponse.json({ 
-        error: "Unauthorized - No session cookie found. Please log in first.",
-        debug: { 
-          hasCookie: !!sessionToken,
-          availableCookies: Object.keys(cookies)
-        }
-      }, { status: 401 });
-    }
-
-    if (!NEXTAUTH_SECRET) {
-      return NextResponse.json({ 
-        error: "Server configuration error - NEXTAUTH_SECRET not set",
-        debug: { hasSecret: !!NEXTAUTH_SECRET }
-      }, { status: 500 });
-    }
-
-    // Verify JWT token
-    let email: string;
-    try {
-      // Decode URL-encoded token if needed
-      const decodedToken = decodeURIComponent(sessionToken);
-      console.log("Decoded token length:", decodedToken.length);
-      
-      const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
-      const { payload } = await jwtVerify(decodedToken, secret);
-      email = payload.email as string;
-      console.log("Decoded email:", email);
-      console.log("Token payload:", payload);
-    } catch (e) {
-      console.error("JWT verification failed:", e);
-      return NextResponse.json({ 
-        error: "Invalid session token",
-        debug: { 
-          error: e instanceof Error ? e.message : "Unknown",
-          tokenLength: sessionToken?.length,
-          tokenStart: sessionToken?.substring(0, 50)
-        }
-      }, { status: 401 });
-    }
-
-    if (!email) {
-      return NextResponse.json({ 
-        error: "Invalid session - no email in token"
+        error: "Unauthorized - Please log in first"
       }, { status: 401 });
     }
 
@@ -126,9 +64,9 @@ export async function POST(request: NextRequest) {
 
     if (status === "COMPLETED") {
       // Update user to Pro
-      const user = getUser(email);
+      const user = getUser(session.user.email);
       if (user) {
-        updateUser(email, {
+        updateUser(session.user.email, {
           isPro: true,
           subscriptionStatus: "active",
           subscriptionId: `paypal_${orderId}`,
@@ -136,7 +74,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Add usage record
-      addUsageRecord(email, {
+      addUsageRecord(session.user.email, {
         originalUrl: "",
         resultUrl: "",
         status: "completed",
