@@ -65,15 +65,34 @@ export const authConfig: NextAuthConfig = {
       return true
     },
     async jwt({ token, user }) {
-      if (user) token.id = user.id
+      if (user) {
+        token.id = user.id
+        token.email = user.email
+      }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id
+        (session.user as any).id = token.id as string
+        (session.user as any).email = token.email as string
       }
       return session
     },
   },
   pages: { signIn: "/login" },
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+      },
+    },
+  },
 }

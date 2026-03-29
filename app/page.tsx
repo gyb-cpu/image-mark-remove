@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "dewatermark.ai — Free AI Watermark Remover Online",
@@ -13,16 +14,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+
   return (
     <main className="min-h-screen bg-gray-950 text-white">
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-        <span className="text-xl font-bold text-indigo-400">dewatermark.ai</span>
-        <div className="flex gap-4 text-sm">
+        <Link href="/" className="text-xl font-bold text-indigo-400">dewatermark.ai</Link>
+        <div className="flex gap-4 text-sm items-center">
           <Link href="/pricing" className="text-gray-400 hover:text-white transition">Pricing</Link>
-          <Link href="/login" className="text-gray-400 hover:text-white transition">Login</Link>
-          <Link href="/app" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Try Free</Link>
+          {session?.user ? (
+            <>
+              <Link href="/dashboard" className="text-gray-400 hover:text-white transition">Dashboard</Link>
+              <Link href="/app" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Try Free</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="text-gray-400 hover:text-white transition">Login</Link>
+              <Link href="/app" className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg transition">Try Free</Link>
+            </>
+          )}
         </div>
       </nav>
 

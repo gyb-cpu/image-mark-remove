@@ -42,46 +42,61 @@ export default function ProButton() {
       clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "",
       currency: "USD",
       intent: "capture",
+      commit: true,
     }}>
       <PayPalButtons
         style={{
-          layout: "vertical",
-          color: "blue",
+          layout: "horizontal",
+          color: "gold",
           shape: "rect",
-          label: "subscribe",
+          label: "pay",
+          tagline: false,
         }}
         createOrder={async () => {
           setIsProcessing(true);
-          const response = await fetch("/api/paypal/create-order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: "12", currency: "USD" }),
-          });
-          const data = await response.json();
-          if (!data.orderId) {
-            throw new Error("Failed to create order");
+          try {
+            const response = await fetch("/api/paypal/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ amount: "12", currency: "USD" }),
+            });
+            const data = await response.json();
+            if (!data.orderId) {
+              throw new Error("Failed to create order");
+            }
+            return data.orderId;
+          } catch (err) {
+            setIsProcessing(false);
+            throw err;
           }
-          return data.orderId;
         }}
         onApprove={async (data) => {
-          const response = await fetch("/api/paypal/capture-order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderId: data.orderID }),
-          });
-          const result = await response.json();
-          
-          if (result.success) {
-            router.push("/dashboard?upgraded=true");
-          } else {
-            const errorMsg = result.details || result.error || "Payment failed";
-            alert(`Payment error: ${errorMsg}`);
+          try {
+            const response = await fetch("/api/paypal/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: data.orderID }),
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+              router.push("/dashboard?upgraded=true");
+            } else {
+              const errorMsg = result.details || result.error || "Payment failed";
+              alert(`Payment error: ${errorMsg}`);
+            }
+          } catch (err) {
+            alert("Payment processing failed. Please try again.");
+          } finally {
+            setIsProcessing(false);
           }
-          setIsProcessing(false);
         }}
         onError={(err) => {
           console.error("PayPal error:", err);
           alert("Payment failed. Please try again.");
+          setIsProcessing(false);
+        }}
+        onCancel={() => {
           setIsProcessing(false);
         }}
       />
