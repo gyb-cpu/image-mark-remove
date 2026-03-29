@@ -2,11 +2,40 @@
 
 import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ProButton() {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data) => {
+        setIsLoggedIn(!!data?.user);
+      })
+      .catch(() => setIsLoggedIn(false));
+  }, []);
+
+  if (isLoggedIn === false) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-gray-300 mb-3">Please log in to upgrade</p>
+        <a
+          href="/login"
+          className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg transition"
+        >
+          Log In
+        </a>
+      </div>
+    );
+  }
+
+  if (isLoggedIn === null) {
+    return <div className="h-20 flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <PayPalScriptProvider options={{
@@ -29,6 +58,9 @@ export default function ProButton() {
             body: JSON.stringify({ amount: "12", currency: "USD" }),
           });
           const data = await response.json();
+          if (!data.orderId) {
+            throw new Error("Failed to create order");
+          }
           return data.orderId;
         }}
         onApprove={async (data) => {
@@ -42,7 +74,8 @@ export default function ProButton() {
           if (result.success) {
             router.push("/dashboard?upgraded=true");
           } else {
-            alert("Payment processing failed. Please try again.");
+            const errorMsg = result.details || result.error || "Payment failed";
+            alert(`Payment error: ${errorMsg}`);
           }
           setIsProcessing(false);
         }}
