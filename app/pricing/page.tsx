@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Free and Pro plans for AI watermark removal.",
 };
 
+export const runtime = 'edge';
+
 export default async function PricingPage() {
   const session = await auth();
 
