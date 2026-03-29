@@ -83,6 +83,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status }, { status: 200 });
   } catch (error) {
     console.error("PayPal capture error:", error);
-    return NextResponse.json({ error: "Failed to capture PayPal payment" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ 
+      error: "Failed to capture PayPal payment",
+      details: errorMessage,
+      env: {
+        hasClientId: !!process.env.PAYPAL_CLIENT_ID,
+        hasSecret: !!process.env.PAYPAL_SECRET,
+        apiUrl: process.env.PAYPAL_API_URL
+      }
+    }, { status: 500 });
   }
 }
