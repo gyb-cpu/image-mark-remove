@@ -72,8 +72,12 @@ export async function POST(request: NextRequest) {
     // Verify JWT token
     let email: string;
     try {
+      // Decode URL-encoded token if needed
+      const decodedToken = decodeURIComponent(sessionToken);
+      console.log("Decoded token length:", decodedToken.length);
+      
       const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
-      const { payload } = await jwtVerify(sessionToken, secret);
+      const { payload } = await jwtVerify(decodedToken, secret);
       email = payload.email as string;
       console.log("Decoded email:", email);
       console.log("Token payload:", payload);
@@ -81,7 +85,11 @@ export async function POST(request: NextRequest) {
       console.error("JWT verification failed:", e);
       return NextResponse.json({ 
         error: "Invalid session token",
-        debug: { error: e instanceof Error ? e.message : "Unknown" }
+        debug: { 
+          error: e instanceof Error ? e.message : "Unknown",
+          tokenLength: sessionToken?.length,
+          tokenStart: sessionToken?.substring(0, 50)
+        }
       }, { status: 401 });
     }
 
