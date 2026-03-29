@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser, updateUser, addUsageRecord } from "@/lib/users-memory";
-import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 
 export const runtime = 'edge';
@@ -28,9 +27,15 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-async function getSessionFromCookie(cookiesHeader: Headers) {
-  const cookieStore = cookies();
-  const sessionToken = cookieStore.get("next-auth.session-token")?.value;
+function parseCookie(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.split(';').find(c => c.trim().startsWith(name + '='));
+  return match ? match.split('=')[1] : null;
+}
+
+async function getSessionFromCookie(request: NextRequest) {
+  const cookieHeader = request.headers.get('cookie');
+  const sessionToken = parseCookie(cookieHeader, 'next-auth.session-token');
   
   if (!sessionToken || !NEXTAUTH_SECRET) return null;
   
@@ -38,14 +43,15 @@ async function getSessionFromCookie(cookiesHeader: Headers) {
     const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
     const { payload } = await jwtVerify(sessionToken, secret);
     return { user: { email: payload.email as string, id: payload.sub as string } };
-  } catch {
+  } catch (e) {
+    console.error("Session decode error:", e);
     return null;
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionFromCookie(request.headers);
+    const session = await getSessionFromCookie(request);
     
     if (!session?.user?.email) {
       return NextResponse.json({ 
