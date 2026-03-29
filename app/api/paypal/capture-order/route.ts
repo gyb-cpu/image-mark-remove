@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
         originalUrl: "", resultUrl: "", status: "completed", creditsUsed: 0,
       });
 
-      return NextResponse.json({ success: true, debug });
+      return NextResponse.json({ 
+        success: true, 
+        status: "COMPLETED",
+        debug 
+      });
     }
 
     return NextResponse.json({ debug });
