@@ -29,9 +29,27 @@ export interface UsageRecord {
 export const users: Record<string, User> = {};
 export const usageHistory: Record<string, UsageRecord[]> = {};
 
-// Helper to get or create user
+// Helper to get or create user (sync version for Edge runtime)
 export function getUser(email: string): User | null {
-  return users[email] || null;
+  // Check memory first
+  if (users[email]) return users[email];
+  
+  // Check KV storage (synchronous in Edge)
+  const kv = (globalThis as any).USERS_KV;
+  if (kv && typeof kv.get === 'function') {
+    try {
+      const raw = kv.get(`user:${email}`);
+      if (raw) {
+        const user = JSON.parse(raw);
+        users[email] = user; // Cache in memory
+        return user;
+      }
+    } catch (e) {
+      console.error("KV get error:", e);
+    }
+  }
+  
+  return null;
 }
 
 // Helper to create user on first login
@@ -53,13 +71,40 @@ export function createUser(email: string, name?: string, avatar?: string, google
   
   users[email] = user;
   usageHistory[email] = [];
+  
+  // Also save to KV
+  const kv = (globalThis as any).USERS_KV;
+  if (kv && typeof kv.put === 'function') {
+    kv.put(`user:${email}`, JSON.stringify(user)).catch(console.error);
+  }
+  
   return user;
 }
 
 // Helper to add usage record
 export function addUsageRecord(email: string, record: Omit<UsageRecord, 'id' | 'userId' | 'createdAt'>): UsageRecord {
-  const user = users[email];
-  if (!user) throw new Error('User not found');
+  let user = users[email];
+  
+  // Try to get from KV if not in memory
+  if (!user) {
+    const kv = (globalThis as any).USERS_KV;
+    if (kv) {
+      try {
+        const raw = kv.get(`user:${email}`);
+        if (raw) {
+          user = JSON.parse(raw);
+          users[email] = user;
+        }
+      } catch (e) {
+        console.error("KV get error:", e);
+      }
+    }
+  }
+  
+  if (!user) {
+    // User not found, create one (Google login user)
+    user = createUser(email, email.split('@')[0]);
+  }
   
   const newRecord: UsageRecord = {
     ...record,
@@ -84,9 +129,33 @@ export function getUsageHistory(email: string, limit = 20): UsageRecord[] {
 
 // Helper to update user profile
 export function updateUser(email: string, updates: Partial<User>): User | null {
-  const user = users[email];
+  let user = users[email];
+  
+  // Try to get from KV if not in memory
+  if (!user) {
+    const kv = (globalThis as any).USERS_KV;
+    if (kv) {
+      try {
+        const raw = kv.get(`user:${email}`);
+        if (raw) {
+          user = JSON.parse(raw);
+          users[email] = user;
+        }
+      } catch (e) {
+        console.error("KV get error:", e);
+      }
+    }
+  }
+  
   if (!user) return null;
   
   users[email] = { ...user, ...updates };
+  
+  // Save to KV
+  const kv = (globalThis as any).USERS_KV;
+  if (kv && typeof kv.put === 'function') {
+    kv.put(`user:${email}`, JSON.stringify(users[email])).catch(console.error);
+  }
+  
   return users[email];
 }
