@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { getUser, updateUser, addUsageRecord } from "@/lib/users-memory";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 
 export const runtime = 'edge';
 
 const PAYPAL_API_URL = process.env.PAYPAL_API_URL || "https://api-m.sandbox.paypal.com";
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET!;
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET!;
 
 async function getPayPalAccessToken() {
   const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
@@ -26,23 +28,34 @@ async function getPayPalAccessToken() {
   return data.access_token;
 }
 
+async function getSessionFromCookie(cookiesHeader: Headers) {
+  const cookieStore = cookies();
+  const sessionToken = cookieStore.get("next-auth.session-token")?.value;
+  
+  if (!sessionToken || !NEXTAUTH_SECRET) return null;
+  
+  try {
+    const secret = new TextEncoder().encode(NEXTAUTH_SECRET);
+    const { payload } = await jwtVerify(sessionToken, secret);
+    return { user: { email: payload.email as string, id: payload.sub as string } };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    console.log("Session:", JSON.stringify(session));
+    const session = await getSessionFromCookie(request.headers);
     
     if (!session?.user?.email) {
       return NextResponse.json({ 
-        error: "Unauthorized - Please log in first",
-        session: session ? "exists" : "null"
+        error: "Unauthorized - Please log in first"
       }, { status: 401 });
     }
 
     const { orderId } = await request.json();
-    console.log("Order ID:", orderId);
 
     const accessToken = await getPayPalAccessToken();
-    console.log("Got access token");
 
     // Capture the payment
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}/capture`, {
@@ -53,17 +66,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("PayPal response status:", response.status);
-
     if (!response.ok) {
       const error = await response.json();
-      console.error("PayPal error:", error);
       return NextResponse.json({ error }, { status: 400 });
     }
 
     const capture = await response.json();
-    console.log("Capture result:", capture);
-    
     const status = capture.status;
 
     if (status === "COMPLETED") {
@@ -98,8 +106,7 @@ export async function POST(request: NextRequest) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ 
       error: "Failed to capture PayPal payment",
-      details: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
+      details: errorMessage
     }, { status: 500 });
   }
 }
