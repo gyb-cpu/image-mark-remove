@@ -1,5 +1,4 @@
 // Edge-compatible session helper using next-auth JWT
-import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 
 export async function auth(req?: NextRequest) {
@@ -11,12 +10,13 @@ export async function auth(req?: NextRequest) {
     const cookieStore = await cookies();
     const token = cookieStore.get("next-auth.session-token") || cookieStore.get("__Secure-next-auth.session-token");
     if (!token) return null;
-    // Decode JWT
+    // Decode JWT - v5 uses different salt format
     try {
       const { decode } = await import("next-auth/jwt");
       const decoded = await decode({
         token: token.value,
         secret: process.env.NEXTAUTH_SECRET!,
+        salt: "next-auth.session-token",
       });
       if (!decoded?.email) return null;
       return { user: { email: decoded.email as string, id: decoded.id as string } };

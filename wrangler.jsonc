@@ -1,22 +1,7 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
 	"name": "dewatermark",
 	"compatibility_date": "2026-03-17",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"assets": {
-		"directory": ".open-next/assets",
-		"binding": "ASSETS"
-	},
-	"services": [
-		{
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "dewatermark"
-		}
-	],
+	"compatibility_flags": ["nodejs_compat"],
 	"kv_namespaces": [
 		{
 			"binding": "USERS_KV",
@@ -24,6 +9,12 @@
 		}
 	],
 	"vars": {
-		"NEXTAUTH_URL": "https://dewatermarkbyme.xyz"
+		"NEXTAUTH_URL": "https://dewatermarkbyme.xyz",
+		"NEXTAUTH_SECRET": "your-secret-here",
+		"GOOGLE_CLIENT_ID": "your-google-client-id",
+		"GOOGLE_CLIENT_SECRET": "your-google-client-secret",
+		"PAYPAL_API_URL": "https://api-m.sandbox.paypal.com",
+		"PAYPAL_CLIENT_ID": "your-paypal-client-id",
+		"PAYPAL_SECRET": "your-paypal-secret"
 	}
 }

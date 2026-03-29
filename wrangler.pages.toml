@@ -1,0 +1,10 @@
+name = "dewatermark"
+compatibility_date = "2026-03-17"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "USERS_KV"
+id = "ece295318b65487786a6515926f1f00b"
+
+[vars]
+NEXTAUTH_URL = "https://dewatermarkbyme.xyz"

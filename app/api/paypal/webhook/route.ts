@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser, updateUser } from "@/lib/users-memory";
 
+export const runtime = 'edge';
+
 const PAYPAL_API_URL = process.env.PAYPAL_API_URL || "https://api-m.sandbox.paypal.com";
 const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID;
 

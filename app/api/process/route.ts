@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 const CORS_HEADERS = {

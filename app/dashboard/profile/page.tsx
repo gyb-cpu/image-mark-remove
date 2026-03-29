@@ -1,11 +1,12 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUser, updateUser } from "@/lib/users-memory";
 
+export const runtime = 'edge';
+
 export default async function ProfilePage() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const user = getUser(session.user.email);
