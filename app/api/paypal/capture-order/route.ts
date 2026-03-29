@@ -29,13 +29,20 @@ async function getPayPalAccessToken() {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
+    console.log("Session:", JSON.stringify(session));
+    
     if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ 
+        error: "Unauthorized - Please log in first",
+        session: session ? "exists" : "null"
+      }, { status: 401 });
     }
 
     const { orderId } = await request.json();
+    console.log("Order ID:", orderId);
 
     const accessToken = await getPayPalAccessToken();
+    console.log("Got access token");
 
     // Capture the payment
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}/capture`, {
@@ -46,12 +53,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log("PayPal response status:", response.status);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error("PayPal error:", error);
       return NextResponse.json({ error }, { status: 400 });
     }
 
     const capture = await response.json();
+    console.log("Capture result:", capture);
+    
     const status = capture.status;
 
     if (status === "COMPLETED") {
@@ -87,11 +99,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       error: "Failed to capture PayPal payment",
       details: errorMessage,
-      env: {
-        hasClientId: !!process.env.PAYPAL_CLIENT_ID,
-        hasSecret: !!process.env.PAYPAL_SECRET,
-        apiUrl: process.env.PAYPAL_API_URL
-      }
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 }
