@@ -9,42 +9,50 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET!;
 
 async function getPayPalAccessToken() {
-  const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64")}`,
-    },
-    body: "grant_type=client_credentials",
-  });
+  try {
+    const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64")}`,
+      },
+      body: "grant_type=client_credentials",
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to get PayPal access token");
+    if (!response.ok) throw new Error("Failed to get token");
+    const data = await response.json();
+    return data.access_token;
+  } catch (e) {
+    console.error("Token error:", e);
+    throw e;
   }
-
-  const data = await response.json();
-  return data.access_token;
 }
 
 export async function POST(request: NextRequest) {
+  const debug: any = {};
+  
   try {
-    // Use next-auth v5 auth() API to get session
+    // Step 1: Get session
+    debug.step1 = "Getting session";
     const session = await auth();
-    
-    console.log("Session from auth():", session ? { email: session.user?.email, hasId: !!session.user?.id } : "null");
+    debug.session = session ? { email: session.user?.email, hasId: !!session.user?.id } : null;
     
     if (!session?.user?.email) {
-      return NextResponse.json({ 
-        error: "Unauthorized - Please log in first"
-      }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized", debug }, { status: 401 });
     }
 
+    // Step 2: Get order ID
+    debug.step2 = "Parsing order";
     const { orderId } = await request.json();
-    console.log("Processing order:", orderId);
+    debug.orderId = orderId;
 
+    // Step 3: Get PayPal token
+    debug.step3 = "Getting PayPal token";
     const accessToken = await getPayPalAccessToken();
+    debug.hasToken = !!accessToken;
 
-    // Capture the payment
+    // Step 4: Capture payment
+    debug.step4 = "Capturing payment";
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders/${orderId}/capture`, {
       method: "POST",
       headers: {
@@ -53,17 +61,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    debug.paypalStatus = response.status;
+
     if (!response.ok) {
       const error = await response.json();
-      console.error("PayPal capture error:", error);
-      return NextResponse.json({ error }, { status: 400 });
+      debug.paypalError = error;
+      return NextResponse.json({ error, debug }, { status: 400 });
     }
 
     const capture = await response.json();
-    const status = capture.status;
+    debug.capture = { status: capture.status };
 
-    if (status === "COMPLETED") {
-      // Update user to Pro
+    if (capture.status === "COMPLETED") {
+      // Step 5: Update user
+      debug.step5 = "Updating user";
       const user = getUser(session.user.email);
       if (user) {
         updateUser(session.user.email, {
@@ -72,29 +83,17 @@ export async function POST(request: NextRequest) {
           subscriptionId: `paypal_${orderId}`,
         });
       }
-
-      // Add usage record
       addUsageRecord(session.user.email, {
-        originalUrl: "",
-        resultUrl: "",
-        status: "completed",
-        creditsUsed: 0,
+        originalUrl: "", resultUrl: "", status: "completed", creditsUsed: 0,
       });
 
-      return NextResponse.json({
-        success: true,
-        status: "COMPLETED",
-        capture,
-      });
+      return NextResponse.json({ success: true, debug });
     }
 
-    return NextResponse.json({ status }, { status: 200 });
+    return NextResponse.json({ debug });
   } catch (error) {
-    console.error("PayPal capture error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ 
-      error: "Failed to capture PayPal payment",
-      details: errorMessage
-    }, { status: 500 });
+    debug.error = error instanceof Error ? error.message : "Unknown";
+    console.error("Full error:", debug);
+    return NextResponse.json({ error: "Payment failed", debug }, { status: 500 });
   }
 }
