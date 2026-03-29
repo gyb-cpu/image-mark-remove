@@ -72,13 +72,21 @@ export default function ProButton() {
         }}
         onApprove={async (data) => {
           try {
+            console.log("Capturing order:", data.orderID);
+            console.log("Current cookies:", document.cookie.substring(0, 100));
+            
             const response = await fetch("/api/paypal/capture-order", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { 
+                "Content-Type": "application/json",
+              },
               body: JSON.stringify({ orderId: data.orderID }),
-              credentials: "include", // Include cookies
+              credentials: "same-origin", // Send cookies to same origin
             });
+            
+            console.log("Response status:", response.status);
             const result = await response.json();
+            console.log("Response:", result);
             
             if (result.success) {
               router.push("/dashboard?upgraded=true");
@@ -87,6 +95,7 @@ export default function ProButton() {
               alert(`Payment error: ${errorMsg}`);
             }
           } catch (err) {
+            console.error("Payment error:", err);
             alert("Payment processing failed. Please try again.");
           } finally {
             setIsProcessing(false);

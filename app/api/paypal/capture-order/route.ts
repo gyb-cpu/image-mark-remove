@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
   try {
     // Parse cookies from request header
     const cookieHeader = request.headers.get('cookie') || '';
-    console.log("Raw cookie header:", cookieHeader.substring(0, 100) + (cookieHeader.length > 100 ? '...' : ''));
+    console.log("Raw cookie header length:", cookieHeader.length);
+    console.log("Has cookie header:", !!cookieHeader);
     
     // Parse cookie properly
     const cookies: Record<string, string> = {};
@@ -44,11 +45,12 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    console.log("Parsed cookies:", Object.keys(cookies));
+    console.log("Available cookie names:", Object.keys(cookies));
     
-    const sessionToken = cookies['next-auth.session-token'];
+    // Try both possible cookie names
+    const sessionToken = cookies['next-auth.session-token'] || cookies['__Secure-next-auth.session-token'];
     
-    console.log("Has session token:", !!sessionToken);
+    console.log("Found session token:", !!sessionToken);
     console.log("Token length:", sessionToken?.length);
     console.log("Has NEXTAUTH_SECRET:", !!NEXTAUTH_SECRET);
     
